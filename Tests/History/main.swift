@@ -1,0 +1,35 @@
+import Foundation
+var cal = Calendar(identifier: .gregorian)
+cal.timeZone = TimeZone(identifier: "Europe/Rome")!
+func at(_ h:Int,_ m:Int=0,day:Int=15)->Date { cal.date(from:DateComponents(year:2026,month:10,day:day,hour:h,minute:m))! }
+func check(_ ok:Bool,_ name:String) { precondition(ok,name); print("PASS \(name)") }
+let oldReset = Int(at(14,day:22).timeIntervalSince1970)
+let newReset = Int(at(15,3,day:22).timeIntervalSince1970)
+var h = FourHourHistory()
+h.sample(used:90,resetsAt:oldReset,at:at(14),calendar:cal)
+h.sample(used:92,resetsAt:oldReset,at:at(15),calendar:cal)
+check(h.blocks[0].used==2,"cumulative four-hour use")
+let beforeCorrection=h.blocks[0].samples.count
+h.sample(used:92,resetsAt:oldReset,at:at(15),calendar:cal)
+check(h.blocks[0].samples.count==beforeCorrection,"duplicate timestamp ignored")
+h.sample(used:91,resetsAt:oldReset,at:at(15,1),calendar:cal)
+h.sample(used:92,resetsAt:oldReset,at:at(15,2),calendar:cal)
+check(h.blocks[0].used==2,"correction/rebound do not double count")
+h.sample(used:1,resetsAt:newReset,at:at(15,3),calendar:cal)
+check(h.blocks[0].used==3,"weekly reset preserves accumulated four-hour use")
+h.sample(used:2,resetsAt:newReset,at:at(15,4),calendar:cal)
+check(h.blocks[0].used==4,"post-reset delta counted")
+check(h.selected(at:at(10,day:16),calendar:cal)==nil,"missing new window never shows yesterday")
+check(h.selected(at:at(10,day:17),calendar:cal)==nil,"weekend has no work-window graph")
+check(h.selected(at:at(19),calendar:cal)?.startHour==14,"after hours select today's last observed window")
+let simple=UsageBlock(day:"2026-10-15",startHour:14,samples:[UsageSample(time:at(14),used:0),UsageSample(time:at(16),used:4)],baseline:10,latest:14)
+let estimate=WindowEstimate(simple,calendar:cal)!
+check(abs(estimate.pace-2)<0.00001 && abs(estimate.projected-8)<0.00001,"two points/hour projects eight points at 18:00")
+let capped=UsageBlock(day:simple.day,startHour:14,samples:simple.samples,baseline:95,latest:99)
+check(WindowEstimate(capped,calendar:cal)!.projected==5,"projection cannot exceed remaining weekly quota")
+let single=UsageBlock(day:simple.day,startHour:14,samples:[simple.samples[0]],baseline:10,latest:10)
+check(WindowEstimate(single,calendar:cal)==nil,"one sample has no invented pace")
+let ended=UsageBlock(day:simple.day,startHour:14,samples:[UsageSample(time:at(14),used:0),UsageSample(time:at(18),used:4)],baseline:10,latest:14)
+check(WindowEstimate(ended,calendar:cal)!.projected==4,"completed block has no extrapolation past 18:00")
+let data=try! JSONEncoder().encode(h)
+check(try! JSONDecoder().decode(FourHourHistory.self,from:data).blocks[0].used==4,"reset-aware history persists")

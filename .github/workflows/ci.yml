@@ -1,0 +1,18 @@
+name: Build and test
+on:
+  push:
+    branches: [main]
+  pull_request:
+permissions:
+  contents: read
+jobs:
+  macos:
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+      - name: Check quota calculations, shell syntax, and app manifest
+        run: bash scripts/test.sh
+      - name: Build and verify universal app
+        run: bash scripts/package.sh

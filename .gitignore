@@ -1,0 +1,12 @@
+.DS_Store
+._*
+/build/
+/dist/
+*.log
+*.dSYM/
+auth.json
+.env
+.env.*
+status.json
+daily-budget.json
+four-hour-history.json
