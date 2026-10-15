@@ -16,6 +16,8 @@ fixed beside the notch throughout both animations.
   daily allocation of **20 percentage points of the full weekly quota**.
 - On hover: weekly use, daily target consumption, selected four-hour block,
   observed pace, forecast at the end of that block, sample count and one chart.
+- The compact card uses the same 12 pt text inset on all sides. It can extend
+  slightly below the physical notch to fit both rows without squeezing the top.
 - An unavailable value is `—%`; daily is also unavailable on weekends or without
   a weekly (10,080-minute) window.
 - A click/right-click menu exposes refresh, update time, partial-coverage notices
@@ -45,7 +47,9 @@ target or stop usage at zero. `daily used` can exceed 100% of the target.
 Polling intervals that cross a work boundary are apportioned by the proportion of
 working seconds. Intervals over 180 seconds that mix work and non-work are excluded and marked
 partial; an interval entirely inside work credits its full observed delta. Starting midway through a day establishes a new baseline, not an invented
-history. Upstream rounding and reporting delays limit accuracy. Daily is a local
+history. Retained valid chart samples can restore a conservative minimum after a
+ledger migration: the larger observed total is used, never their sum. Coverage
+stays partial. Upstream rounding and reporting delays limit accuracy. Daily is a local
 estimate, not an additional OpenAI quota.
 
 **[Read the full daily calculation guide](docs/daily-budget.md)** for exact formulas,
@@ -134,7 +138,8 @@ synthetic test/preview data only. See [SECURITY.md](SECURITY.md).
 
 ## Verification and troubleshooting
 
-`bash scripts/test.sh` runs **13 quota, 24 daily and 13 history/forecast checks**,
+`bash scripts/test.sh` runs **74 checks: 13 quota, 29 daily, 25 history/forecast and
+7 integration checks**,
 shell syntax checks and manifest validation. `bash scripts/package.sh` builds a
 universal ZIP and SHA-256 file in `dist/`; CI runs math tests and the universal build.
 
@@ -147,7 +152,7 @@ build/notchGPT.app/Contents/MacOS/notchGPT --test-hover
 ```
 
 It checks screen-space header anchoring during intermediate animation frames,
-top-edge anchoring, final state and content size. It is a local UI check, not a
+top-edge anchoring, symmetric text insets, final state and content size. It is a local UI check, not a
 headless CI requirement. Preview modes use synthetic values:
 
 ```sh

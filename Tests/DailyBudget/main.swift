@@ -59,3 +59,17 @@ expect(near(markerMoved.spent,4) && !markerMoved.completeDay, "unconfirmed reset
 let continuousWork = DailyBudget(day:b.day,spent:3,previousUsed:20,previousReset:reset,observedAt:date(10),completeDay:true)
 let afterWorkGap = DailyBudget.sample(previous:continuousWork,quota:quota(24),now:date(11),calendar:cal)
 expect(near(afterWorkGap.spent,7) && afterWorkGap.completeDay, "long interval entirely inside work is exactly attributable")
+
+let repeatedThenNext = DailyBudget.sample(previous:exact,quota:quota(15),now:date(9,3),calendar:cal)
+expect(near(repeatedThenNext.spent,b.spent+1), "duplicate timestamp cannot erase the next consumption increment")
+let instantBaseline = DailyBudget(day:b.day,spent:4,previousUsed:90,previousReset:reset,observedAt:date(9,59),completeDay:true)
+let resetAtInstant = DailyBudget.sample(previous:instantBaseline,quota:quota(1,resetAt:newReset),now:date(10),calendar:cal)
+expect(near(resetAtInstant.spent,5), "known consumption at an exact reset instant is retained")
+var recovered = b
+recovered.recoverObservedMinimum(9)
+expect(recovered.spent == 9 && !recovered.completeDay, "older chart recovers only a conservative observed daily minimum")
+recovered.recoverObservedMinimum(8)
+recovered.recoverObservedMinimum(9)
+expect(recovered.spent == 9, "recovery is idempotent and never reduces or adds overlapping consumption")
+recovered.recoverObservedMinimum(.nan)
+expect(recovered.spent == 9, "invalid recovery amount ignored")

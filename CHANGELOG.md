@@ -1,5 +1,13 @@
 # Changelog
 
+## 1.0.1 — 2026-10-15
+
+- Use one attribution rule for the daily ledger and four-hour charts, including opening/closing boundary readings and excluded gaps.
+- Restore a conservative daily minimum from valid retained chart history after a baseline migration, without summing overlapping totals or claiming complete coverage.
+- Stop forecasting once a work window has ended; retain consumption at an exact weekly reset timestamp and ignore duplicate timestamps without losing the next increment.
+- Give both compact rows equal 12 pt top/bottom/side insets, preserving their screen position throughout hover animations.
+- Expand verification to 74 math checks, including minute-by-minute full-day and five-day integration simulations.
+
 ## 1.0.0 — 2026-10-15
 
 - Initial notchGPT release: shared ChatGPT Work/Codex quota and daily work allowance.

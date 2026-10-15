@@ -7,6 +7,11 @@ final class NotchView: NSView {
     private let compactWidth: CGFloat = 134
     private let textInset: CGFloat = 12
     var compactHeight: CGFloat = 38
+    var minimumReadoutHeight: CGFloat {
+        let font = NSFont.monospacedDigitSystemFont(ofSize: 11, weight: .semibold)
+        let lineHeight = ("chatGPT" as NSString).size(withAttributes: [.font: font]).height
+        return ceil(2 * textInset + lineHeight + 15)
+    }
     var readoutRect: NSRect { NSRect(x: 0, y: bounds.height - compactHeight, width: compactWidth, height: compactHeight) }
     var percent: Int? { didSet { needsDisplay = true } }
     var weeklyUsed: Double?
@@ -65,7 +70,7 @@ final class NotchView: NSView {
         let topMetricY = topOffset - 22
         var pace = "—"
         var projection = "—"
-        if let block, let estimate = WindowEstimate(block) {
+        if let block, let estimate = WindowEstimate(block, at: now) {
             pace = decimal(estimate.pace)
             projection = "\(decimal(estimate.projected))%"
         }
@@ -296,7 +301,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             return
         }
         frameAnimationTimer?.invalidate()
-        let h = screen.safeAreaInsets.top
+        // Two rows need real vertical padding; notch height alone squeezed the
+        // top/bottom insets to about two points while the sides had twelve.
+        let h = max(screen.safeAreaInsets.top, view.minimumReadoutHeight)
         view.compactHeight = h
         let width = compactWidth
         let height = h
@@ -358,7 +365,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         do {
             try FileManager.default.createDirectory(at: stateURL.deletingLastPathComponent(), withIntermediateDirectories: true)
             try proc.run()
-            send(["method": "initialize", "id": 0, "params": ["clientInfo": ["name": "notchgpt", "title": "notchGPT", "version": "1.0.0"]]])
+            send(["method": "initialize", "id": 0, "params": ["clientInfo": ["name": "notchgpt", "title": "notchGPT", "version": "1.0.1"]]])
         } catch { fail("Could not start usage service") }
     }
 
@@ -398,7 +405,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                     } catch { dailyStorageError = true }
                 }
                 if let weekly = WeeklyQuota(snapshot) {
-                    let budget = DailyBudget.sample(previous: dailyBudget, quota: weekly, now: now)
+                    var budget = DailyBudget.sample(previous: dailyBudget, quota: weekly, now: now)
+                    budget.recoverObservedMinimum(fourHourHistory.observedMinimum(day: budget.day))
                     dailyBudget = budget
                     view.dailySpent = budget.spent
                     view.dailyPercent = budget.remainingPercent(weekly: weekly, now: now)
@@ -427,7 +435,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
               let left = screen.auxiliaryTopLeftArea,
               let right = screen.auxiliaryTopRightArea else { return nil }
         let x = left.maxX - compactWidth
-        let height = expanded ? expandedHeight : screen.safeAreaInsets.top
+        let height = expanded ? expandedHeight : max(screen.safeAreaInsets.top, view.minimumReadoutHeight)
         return NSRect(x: x, y: screen.frame.maxY - height,
                       width: expanded ? right.minX - x : compactWidth, height: height)
     }
@@ -566,6 +574,9 @@ if CommandLine.arguments.contains("--test-hover") {
     delegate.panel.contentView = delegate.glassView
     delegate.position()
     let compact = delegate.panel.frame
+    let fontHeight = ("chatGPT" as NSString).size(withAttributes: [.font: NSFont.monospacedDigitSystemFont(ofSize: 11, weight: .semibold)]).height
+    precondition(abs((compact.height - fontHeight - 15) / 2 - 12) < 0.5, "vertical text insets differ from 12 pt side insets")
+    print("PASS compact text: symmetric 12 pt horizontal and vertical layout insets")
     let inside = NSPoint(x: compact.midX, y: compact.midY)
     let outside = NSPoint(x: compact.minX - 100, y: compact.minY - 300)
     func settleAndCheckAnchor() {
@@ -597,7 +608,9 @@ if CommandLine.arguments.contains("--test-hover") {
     delegate.panel.orderOut(nil)
 } else if let index = CommandLine.arguments.firstIndex(of: "--preview"), CommandLine.arguments.count > index + 1 {
     _ = NSApplication.shared
-    let view = NotchView(frame: NSRect(x: 0, y: 0, width: 134, height: 37.5))
+    let view = NotchView(frame: NSRect(x: 0, y: 0, width: 134, height: 52))
+    view.compactHeight = view.minimumReadoutHeight
+    view.setFrameSize(NSSize(width: 134, height: view.compactHeight))
     view.percent = 75
     view.dailyPercent = 55
     view.weeklyUsed = 25
@@ -608,6 +621,7 @@ if CommandLine.arguments.contains("--test-hover") {
 } else if let index = CommandLine.arguments.firstIndex(of: "--preview-expanded"), CommandLine.arguments.count > index + 1 {
     _ = NSApplication.shared
     let view = NotchView(frame: NSRect(x: 0, y: 0, width: 334, height: 190))
+    view.compactHeight = view.minimumReadoutHeight
     view.percent = 75
     view.dailyPercent = 55
     view.weeklyUsed = 25

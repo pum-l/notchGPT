@@ -44,20 +44,8 @@ struct DailyBudget: Codable {
     var calculationVersion: Int? = 2
 
     static func workingSeconds(from start: Date, to end: Date, calendar: Calendar) -> Double {
-        guard end > start else { return 0 }
-        var day = calendar.startOfDay(for: start)
-        var seconds = 0.0
-        while day < end {
-            if !calendar.isDateInWeekend(day) {
-                for hour in [9, 14] {
-                    let lower = calendar.date(bySettingHour: hour, minute: 0, second: 0, of: day)!
-                    let upper = calendar.date(bySettingHour: hour + 4, minute: 0, second: 0, of: day)!
-                    seconds += max(0, min(end, upper).timeIntervalSince(max(start, lower)))
-                }
-            }
-            day = calendar.date(byAdding: .day, value: 1, to: day)!
-        }
-        return seconds
+        WorkUsage.segments(from: start, to: end, calendar: calendar)
+            .reduce(0) { $0 + $1.end.timeIntervalSince($1.start) }
     }
 
     static func sample(previous: DailyBudget?, quota: WeeklyQuota, now: Date,
@@ -74,31 +62,26 @@ struct DailyBudget: Codable {
         }
         var spent = old.day == day ? old.spent : 0
         var complete = old.day == day ? old.completeDay : old.observedAt <= opening
-        let interval = now.timeIntervalSince(old.observedAt)
+        // Repeated timestamps must not silently advance the high-water baseline.
+        guard now > old.observedAt else { return old }
         let observedWork = workingSeconds(from: max(old.observedAt, midnight), to: now, calendar: calendar)
-        if interval > 0, observedWork > 0 {
-            if interval <= 180 || abs(observedWork - interval) < 0.001 {
-                // At reset, only the new window's usage is known. Restrict the
-                // attribution interval to the part after that reset.
-                let sameCycle = quota.resetsAt == old.previousReset
-                let confirmedReset = quota.startsAt >= old.observedAt && quota.startsAt <= now
-                let start = sameCycle ? old.observedAt : max(old.observedAt, quota.startsAt)
-                let duration = now.timeIntervalSince(start)
-                let work = workingSeconds(from: max(start, midnight), to: now, calendar: calendar)
-                let delta = sameCycle ? max(0, quota.used - old.previousUsed) : (confirmedReset ? quota.used : 0)
-                if duration > 0 { spent += delta * min(1, work / duration) }
-                if quota.resetsAt != old.previousReset {
-                    // The last pre-reset consumption cannot be recovered from the new cycle.
-                    complete = false
-                }
-            } else {
-                // Long gaps mixing work/non-work provide no defensible boundary split.
-                complete = false
-            }
-        }
+        let attribution = WorkUsage.attribute(previousUsed: old.previousUsed, previousReset: old.previousReset,
+                                              used: quota.used, reset: quota.resetsAt,
+                                              from: old.observedAt, to: now, calendar: calendar)
+        spent += attribution.credits.filter { $0.day == day }.reduce(0) { $0 + $1.amount }
+        if observedWork > 0, attribution.partial { complete = false }
         let highWater = quota.resetsAt == old.previousReset ? max(old.previousUsed, quota.used) : quota.used
         return DailyBudget(day: day, spent: spent, previousUsed: highWater,
                            previousReset: quota.resetsAt, observedAt: now, completeDay: complete)
+    }
+
+    // A migrated ledger may cover less of today than the retained chart. Taking
+    // the larger observed total recovers a conservative lower bound without
+    // adding overlapping measurements or pretending to know missing morning use.
+    mutating func recoverObservedMinimum(_ minimum: Double) {
+        guard minimum.isFinite, minimum > spent else { return }
+        spent = minimum
+        completeDay = false
     }
 
     func remainingPercent(weekly: WeeklyQuota, now: Date, calendar: Calendar = .current) -> Int? {

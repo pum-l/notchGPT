@@ -13,13 +13,13 @@ mkdir -p "$app/Contents/Resources"
 if [[ "${1:-}" == "--universal" ]]; then
     for arch in arm64 x86_64; do
         xcrun swiftc -O -swift-version 5 -target "$arch-apple-macos13.0" \
-            -framework AppKit Sources/Quota.swift Sources/DailyBudget.swift Sources/FourHourHistory.swift Sources/main.swift -o "$scratch/notchGPT-$arch"
+            -framework AppKit Sources/Quota.swift Sources/WorkUsage.swift Sources/DailyBudget.swift Sources/FourHourHistory.swift Sources/main.swift -o "$scratch/notchGPT-$arch"
     done
     xcrun lipo -create "$scratch/notchGPT-arm64" "$scratch/notchGPT-x86_64" -output "$app/Contents/MacOS/notchGPT"
 elif [[ $# -eq 0 ]]; then
     arch="$(uname -m)"
     xcrun swiftc -O -swift-version 5 -target "$arch-apple-macos13.0" \
-        -framework AppKit Sources/Quota.swift Sources/DailyBudget.swift Sources/FourHourHistory.swift Sources/main.swift -o "$app/Contents/MacOS/notchGPT"
+        -framework AppKit Sources/Quota.swift Sources/WorkUsage.swift Sources/DailyBudget.swift Sources/FourHourHistory.swift Sources/main.swift -o "$app/Contents/MacOS/notchGPT"
 else
     echo "Usage: $0 [--universal]" >&2
     exit 2

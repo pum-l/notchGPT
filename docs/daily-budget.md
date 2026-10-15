@@ -109,6 +109,15 @@ calculation with a fresh baseline rather than reusing spending that included lun
 and evenings. Missing/invalid or future-dated state is handled as a new baseline.
 Nothing rewrites the user's Codex state or conversations.
 
+If a previous migration discarded an older daily baseline, valid retained chart
+samples can still prove a minimum amount spent during work today. The app takes
+`S = max(S, sumOfTodaysObservedBlocks)`. It does **not** add the two overlapping
+totals. The restored amount stays marked partial: it cannot recover missing
+morning activity or spending before the chart's first sample. Yesterday's blocks,
+out-of-window timestamps, duplicate windows and nonmonotonic samples are excluded.
+Repeated recovery is idempotent. New readings continue from the current weekly
+high-water, so restoring history does not charge it a second time.
+
 ## Worked examples
 
 | Readings / situation | Attribution | Result |
@@ -133,9 +142,16 @@ daily budget. A chart value of 3 therefore corresponds to 15% of the daily targe
 if all that use was captured by the daily ledger. Missing samples/boundary
 attribution can make them differ.
 
-The chart starts at its first observed sample and shows cumulative increases from
-that baseline. It preserves cumulative consumption through a weekly reset and
-avoids duplicate charges after corrections. Unobserved intervals over 180 seconds
+The chart and daily ledger share the same attribution function, high-water rule,
+reset handling and gap policy. Readings outside work also advance the chart's
+weekly baseline, so lunch/evening use cannot leak into the next block. A short
+reading interval straddling 09:00 or 14:00 can create a zero baseline at opening;
+one straddling 13:00 or 18:00 records its work share at the exact closing time.
+Otherwise the chart starts at its first observed sample and shows cumulative
+increases from that baseline. It preserves cumulative consumption through a
+weekly reset and avoids duplicate charges after corrections. A known positive
+reading at the exact reset timestamp is retained when that instant is inside
+work; reset timestamps only have second precision. Unobserved intervals over 180 seconds
 break the drawn line. No area is drawn towards future hours. The selected active
 window never falls back to yesterday's graph; outside work the app can show today's
 last observed block. Fourteen blocks are retained locally.
@@ -144,9 +160,16 @@ last observed block. Fourteen blocks are retained locally.
 It does not drift downward merely because an old graph is viewed later. With fewer
 than two distinct samples, pace and estimate are unavailable.
 
-`estimate` = observed consumption + the current average pace × hours from the last
+During an active block, `estimate` = observed consumption + the current average pace × hours from the last
 sample until the block's local end, capped by remaining weekly quota. For 4 weekly
 points used from 14:00 to 16:00, pace is 2 points/hour and the projected block total
 at 18:00 is 8 points. This is a constant-pace forecast, not a subscription limit or
-guarantee. Gaps/rounding make it approximate. `samples` counts readings, not tasks,
-messages or model turns. Zero samples do not establish zero consumption.
+guarantee. Once the block has ended, `estimate` equals its observed consumption;
+it never projects into an already elapsed, unobserved tail. Gaps/rounding make it
+approximate. `samples` counts stored chart points, including boundary anchors,
+not tasks, messages or model turns. Zero samples do not establish zero consumption.
+
+The integration suite independently checks all 480 working minutes against a
+minute-by-minute schedule, verifies forty hours and one hundred percentage points
+over five days, and compares daily/chart totals through lunch, corrections,
+resets, persistence and exact opening/closing boundaries.
