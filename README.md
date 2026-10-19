@@ -12,13 +12,15 @@ fixed beside the notch throughout both animations.
   For 80% left in one window and 25% in another, it displays 25%. Fractional
   remainders round down. This is the shared ChatGPT Work/Codex subscription meter;
   it is not classic ChatGPT message limits, voice/image quota or API billing.
-- `daily`: a local estimate for **09–13 and 14–18, Monday–Friday**, sharing a
-  daily allocation of **20 percentage points of the full weekly quota**.
-- On hover: weekly use, daily target consumption, selected four-hour block,
+- `window`: the remaining local budget for the selected **09–13 or 14–18,
+  Monday–Friday** block. Each block has **10 percentage points of the full weekly
+  quota**, equivalent to half of the twenty-point workday budget. Three weekly
+  points spent in that block leave 70% of its window budget.
+- On hover: weekly use, window target consumption, selected four-hour block,
   observed pace, forecast at the end of that block, sample count and one chart.
-- The compact card uses the same 12 pt text inset on all sides. It can extend
-  slightly below the physical notch to fit both rows without squeezing the top.
-- An unavailable value is `—%`; daily is also unavailable on weekends or without
+- The compact card matches the physical notch height exactly. Horizontal text
+  insets are 12 pt; vertical spacing fits the two rows inside that height.
+- An unavailable value is `—%`; window is also unavailable on weekends or without
   a weekly (10,080-minute) window.
 - A click/right-click menu exposes refresh, update time, partial-coverage notices
   and quit. Login startup is available through the installer.
@@ -27,7 +29,26 @@ Allowance refreshes at startup, on wake, manually, and approximately every
 **60 seconds** while awake. Hover uses local pointer checks, not account polling.
 The task-list experiment is absent: no task database reads or task polling.
 
-## Daily: two windows, one allowance
+## Window: a four-hour budget
+
+The visible `window` row uses `100 / (5 × 2) = 10` weekly percentage points per
+four-hour block. Its remainder is:
+
+```text
+windowRemaining = floor(100 * min(max(0, 10 - observedBlockUse), max(0, 100 - weeklyUsed)) / 10)
+```
+
+It is a local planning target, not an official four-hour subscription limit.
+The afternoon has its own ten-point allocation; unused morning points do not
+carry over. During lunch/after 18:00, today's last observed block stays visible.
+Before 09:00, on weekends or without a baseline for an active block, it shows
+`—%`. A late start counts only observed consumption. The first row still displays
+the actual shared account quota. Polling and stored chart history are unchanged.
+
+## Daily ledger: two windows, one allowance
+
+The daily ledger remains stored for continuity and math checks; the compact card
+and expanded consumption statistic now display the window budget instead.
 
 The morning and afternoon share **eight working hours and a single twenty-point
 budget**. Lunch, evenings and weekends are excluded. No reset occurs at 14:00.
@@ -42,7 +63,7 @@ dailyRemaining = floor(100 * availableToday / 20)
 
 Example: **3 weekly percentage points spent during work consume 15% of today's
 budget, leaving 85%** if the weekly balance allows it. The app does not enforce the
-target or stop usage at zero. `daily used` can exceed 100% of the target.
+target or stop usage at zero. Recorded daily consumption can exceed 100% of the target.
 
 Polling intervals that cross a work boundary are apportioned by the proportion of
 working seconds. Intervals over 180 seconds that mix work and non-work are excluded and marked
@@ -138,7 +159,7 @@ synthetic test/preview data only. See [SECURITY.md](SECURITY.md).
 
 ## Verification and troubleshooting
 
-`bash scripts/test.sh` runs **74 checks: 13 quota, 29 daily, 25 history/forecast and
+`bash scripts/test.sh` runs **84 checks: 13 quota, 29 daily, 35 history/forecast/window and
 7 integration checks**,
 shell syntax checks and manifest validation. `bash scripts/package.sh` builds a
 universal ZIP and SHA-256 file in `dist/`; CI runs math tests and the universal build.
@@ -152,7 +173,7 @@ build/notchGPT.app/Contents/MacOS/notchGPT --test-hover
 ```
 
 It checks screen-space header anchoring during intermediate animation frames,
-top-edge anchoring, symmetric text insets, final state and content size. It is a local UI check, not a
+top-edge anchoring, physical-notch height, final state and content size. It is a local UI check, not a
 headless CI requirement. Preview modes use synthetic values:
 
 ```sh
@@ -162,12 +183,12 @@ build/notchGPT.app/Contents/MacOS/notchGPT --preview-expanded /tmp/notch-expande
 
 - **No widget:** a notched display must be connected and reported by macOS.
 - **`—%`:** check the menu error, Codex sign-in and connectivity, then Refresh Now.
-- **Daily initially 100%:** expected when no full-day baseline exists; the menu
-  marks partial work coverage. The number reflects observed spending only.
-- **Rows disagree:** `chatGPT` uses the most restrictive account window; daily
-  specifically uses the weekly window and a twenty-point workday target.
-- **`daily used` and daily remaining do not sum to 100:** the weekly balance may
-  cap availability, or spending may exceed the daily target.
+- **Window initially 100%:** expected when a block's first baseline is established;
+  the menu reports the first observed sample time. Earlier spending is unknown.
+- **Rows disagree:** `chatGPT` uses the most restrictive account window; `window`
+  uses the weekly quota and a ten-point four-hour target.
+- **`window used` and window remaining do not sum to 100:** the weekly balance may
+  cap availability, or spending may exceed the window target.
 - **Lag:** reads occur once a minute and upstream reporting can also lag.
 - **Startup:** inspect `launchctl print "gui/$(id -u)/dev.notchgpt.mac"` and
   the generic local status file; avoid publishing raw personal diagnostics.

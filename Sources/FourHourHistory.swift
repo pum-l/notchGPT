@@ -19,6 +19,8 @@ struct UsageBlock: Codable {
 }
 
 struct FourHourHistory: Codable {
+    // Five workdays × two four-hour windows share the full weekly allowance.
+    static let windowAllowance: Double = 10
     var blocks: [UsageBlock] = []
     var previousUsed: Double? = nil
     var previousReset: Int? = nil
@@ -116,6 +118,13 @@ struct FourHourHistory: Codable {
 
     func amount(day: String, hour: Int) -> Double? {
         blocks.last(where: { $0.day == day && $0.startHour == hour })?.used
+    }
+
+    func windowRemainingPercent(weeklyUsed: Double, at now: Date, calendar: Calendar = .current) -> Int? {
+        guard weeklyUsed.isFinite, (0...100).contains(weeklyUsed),
+              let block = selected(at: now, calendar: calendar), block.used.isFinite, block.used >= 0 else { return nil }
+        let left = min(max(0, Self.windowAllowance - block.used), 100 - weeklyUsed)
+        return min(100, max(0, Int(floor(left / Self.windowAllowance * 100 + 0.00000001))))
     }
 }
 

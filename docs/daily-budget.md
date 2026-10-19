@@ -1,5 +1,23 @@
 # Daily allowance: two working windows
 
+Since 1.0.2, the widget displays **`window`**, not `daily`. Each four-hour block
+gets `100 / (5 working days × 2 windows) = 10` weekly percentage points:
+
+```text
+windowRemaining = floor(100 * min(max(0, 10 - observedBlockUse), max(0, 100 - weeklyUsed)) / 10)
+```
+
+Three weekly points in a block therefore leave 70% of its local window target.
+The afternoon starts a separate ten-point budget; morning spending does not debit
+it. During lunch and after 18:00, today's last observed block remains selected.
+Weekends, before 09:00 and active blocks without a baseline show `—%`. Late starts
+count only observed use. The expanded `window used` statistic uses the same
+ten-point denominator. None of these are official four-hour subscription limits.
+
+The daily ledger described below is still maintained for persistence and
+validation. Its twenty-point formula is unchanged, but it is no longer the
+percentage shown in the compact widget.
+
 `daily` is a local pacing estimate, **not an OpenAI quota or a time-left counter**.
 It measures how much of a self-imposed working-day allowance remains. The account
 can still have quota after `daily` reaches zero. Consuming time alone never reduces

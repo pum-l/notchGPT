@@ -7,11 +7,6 @@ final class NotchView: NSView {
     private let compactWidth: CGFloat = 134
     private let textInset: CGFloat = 12
     var compactHeight: CGFloat = 38
-    var minimumReadoutHeight: CGFloat {
-        let font = NSFont.monospacedDigitSystemFont(ofSize: 11, weight: .semibold)
-        let lineHeight = ("chatGPT" as NSString).size(withAttributes: [.font: font]).height
-        return ceil(2 * textInset + lineHeight + 15)
-    }
     var readoutRect: NSRect { NSRect(x: 0, y: bounds.height - compactHeight, width: compactWidth, height: compactHeight) }
     var percent: Int? { didSet { needsDisplay = true } }
     var weeklyUsed: Double?
@@ -48,7 +43,8 @@ final class NotchView: NSView {
             .font: NSFont.monospacedDigitSystemFont(ofSize: 11, weight: .semibold),
             .foregroundColor: NSColor.white
         ]
-        for (index, row) in [("chatGPT", percent), ("daily", dailyPercent)].enumerated() {
+        let windowPercent = weeklyUsed.flatMap { history?.windowRemainingPercent(weeklyUsed: $0, at: Date()) }
+        for (index, row) in [("chatGPT", percent), ("window", windowPercent)].enumerated() {
             let value = row.1.map { "\($0)%" } ?? "—%"
             let size = (value as NSString).size(withAttributes: attrs)
             let centerY = readoutRect.midY + (index == 0 ? 7.5 : -7.5)
@@ -78,7 +74,7 @@ final class NotchView: NSView {
         drawCompactMetric("pace %/h", value: pace, y: topMetricY - 14, attrs: metricAttrs)
         drawCompactMetric("estimate", value: projection, y: topMetricY - 28, attrs: metricAttrs)
         drawRightMetric("weekly used", value: weeklyUsed.map { "\(decimal($0))%" } ?? "—", y: topMetricY, attrs: metricAttrs)
-        drawRightMetric("daily used", value: dailySpent.map { "\(decimal($0 / DailyBudget.allowance * 100))%" } ?? "—", y: topMetricY - 14, attrs: metricAttrs)
+        drawRightMetric("window used", value: block.map { "\(decimal($0.used / FourHourHistory.windowAllowance * 100))%" } ?? "—", y: topMetricY - 14, attrs: metricAttrs)
         drawRightMetric("samples", value: block.map { "\($0.samples.count)" } ?? "0", y: topMetricY - 28, attrs: metricAttrs)
 
         let chartRect = NSRect(x: 32, y: 24, width: bounds.width - 44, height: 32)
@@ -301,9 +297,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             return
         }
         frameAnimationTimer?.invalidate()
-        // Two rows need real vertical padding; notch height alone squeezed the
-        // top/bottom insets to about two points while the sides had twelve.
-        let h = max(screen.safeAreaInsets.top, view.minimumReadoutHeight)
+        // The compact extension must end at the physical notch's lower edge.
+        let h = screen.safeAreaInsets.top
         view.compactHeight = h
         let width = compactWidth
         let height = h
@@ -365,7 +360,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         do {
             try FileManager.default.createDirectory(at: stateURL.deletingLastPathComponent(), withIntermediateDirectories: true)
             try proc.run()
-            send(["method": "initialize", "id": 0, "params": ["clientInfo": ["name": "notchgpt", "title": "notchGPT", "version": "1.0.1"]]])
+            send(["method": "initialize", "id": 0, "params": ["clientInfo": ["name": "notchgpt", "title": "notchGPT", "version": "1.0.2"]]])
         } catch { fail("Could not start usage service") }
     }
 
@@ -435,7 +430,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
               let left = screen.auxiliaryTopLeftArea,
               let right = screen.auxiliaryTopRightArea else { return nil }
         let x = left.maxX - compactWidth
-        let height = expanded ? expandedHeight : max(screen.safeAreaInsets.top, view.minimumReadoutHeight)
+        let height = expanded ? expandedHeight : screen.safeAreaInsets.top
         return NSRect(x: x, y: screen.frame.maxY - height,
                       width: expanded ? right.minX - x : compactWidth, height: height)
     }
@@ -514,6 +509,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             "display": view.percent.map { "\($0)%" } ?? "—%", "visible": panel?.isVisible ?? false]
         if let percent = view.percent { state["remainingPercent"] = percent }
         if let percent = view.dailyPercent { state["dailyRemainingPercent"] = percent }
+        if let weeklyUsed = view.weeklyUsed,
+           let percent = fourHourHistory.windowRemainingPercent(weeklyUsed: weeklyUsed, at: Date()) {
+            state["windowRemainingPercent"] = percent
+        }
+        state["windowAllowanceWeeklyPercent"] = FourHourHistory.windowAllowance
         state["dailyAllowanceWeeklyPercent"] = DailyBudget.allowance
         if let budget = dailyBudget {
             state["dailySpentWeeklyPercent"] = budget.spent
@@ -534,13 +534,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         let menu = NSMenu()
         let title = NSMenuItem(title: "Codex and ChatGPT Work: shared allowance", action: nil, keyEquivalent: "")
         menu.addItem(title)
-        menu.addItem(withTitle: "Daily: 20% weekly allowance across 09–13 + 14–18", action: nil, keyEquivalent: "")
-        menu.addItem(withTitle: "Local workday; no carry-over; weekends excluded", action: nil, keyEquivalent: "")
-        if dailyBudget?.completeDay == false {
-            menu.addItem(withTitle: "Daily estimate: partial working-hours coverage", action: nil, keyEquivalent: "")
+        menu.addItem(withTitle: "Window: 10% of weekly allowance per 09–13 / 14–18 block", action: nil, keyEquivalent: "")
+        menu.addItem(withTitle: "Local estimate; no carry-over; weekends excluded", action: nil, keyEquivalent: "")
+        if let block = fourHourHistory.selected(at: Date()), let since = block.trackingSince {
+            let formatter = DateFormatter(); formatter.dateFormat = "HH:mm"
+            menu.addItem(withTitle: "Window uses observed samples since \(formatter.string(from: since))", action: nil, keyEquivalent: "")
         }
         if dailyStorageError {
-            menu.addItem(withTitle: "Could not save daily history; keep app running", action: nil, keyEquivalent: "")
+            menu.addItem(withTitle: "Could not save usage history; keep app running", action: nil, keyEquivalent: "")
         }
         if let date = lastUpdated {
             let formatter = DateFormatter(); formatter.timeStyle = .short
@@ -574,9 +575,10 @@ if CommandLine.arguments.contains("--test-hover") {
     delegate.panel.contentView = delegate.glassView
     delegate.position()
     let compact = delegate.panel.frame
-    let fontHeight = ("chatGPT" as NSString).size(withAttributes: [.font: NSFont.monospacedDigitSystemFont(ofSize: 11, weight: .semibold)]).height
-    precondition(abs((compact.height - fontHeight - 15) / 2 - 12) < 0.5, "vertical text insets differ from 12 pt side insets")
-    print("PASS compact text: symmetric 12 pt horizontal and vertical layout insets")
+    let notchHeight = NSScreen.screens.first(where: { $0.safeAreaInsets.top > 0 })!.safeAreaInsets.top
+    // AppKit rounds a scaled display's fractional 37.5 pt notch to a 38 pt frame.
+    precondition(abs(compact.height - notchHeight) <= 0.5, "compact extension taller than physical notch")
+    print("PASS compact height matches the physical notch within AppKit frame rounding")
     let inside = NSPoint(x: compact.midX, y: compact.midY)
     let outside = NSPoint(x: compact.minX - 100, y: compact.minY - 300)
     func settleAndCheckAnchor() {
@@ -608,20 +610,24 @@ if CommandLine.arguments.contains("--test-hover") {
     delegate.panel.orderOut(nil)
 } else if let index = CommandLine.arguments.firstIndex(of: "--preview"), CommandLine.arguments.count > index + 1 {
     _ = NSApplication.shared
-    let view = NotchView(frame: NSRect(x: 0, y: 0, width: 134, height: 52))
-    view.compactHeight = view.minimumReadoutHeight
-    view.setFrameSize(NSSize(width: 134, height: view.compactHeight))
+    let height = NSScreen.screens.first(where: { $0.safeAreaInsets.top > 0 })?.safeAreaInsets.top ?? 32
+    let view = NotchView(frame: NSRect(x: 0, y: 0, width: 134, height: height))
+    view.compactHeight = height
     view.percent = 75
     view.dailyPercent = 55
     view.weeklyUsed = 25
     view.dailySpent = 9
+    let now = Date()
+    let hour = Calendar.current.component(.hour, from: now) < 14 ? 9 : 14
+    view.history = FourHourHistory(blocks: [UsageBlock(day: FourHourHistory.dayKey(now), startHour: hour,
+        samples: [UsageSample(time: now, used: 3)], baseline: 22, latest: 25)])
     let rep = view.bitmapImageRepForCachingDisplay(in: view.bounds)!
     view.cacheDisplay(in: view.bounds, to: rep)
     try rep.representation(using: .png, properties: [:])!.write(to: URL(fileURLWithPath: CommandLine.arguments[index + 1]))
 } else if let index = CommandLine.arguments.firstIndex(of: "--preview-expanded"), CommandLine.arguments.count > index + 1 {
     _ = NSApplication.shared
     let view = NotchView(frame: NSRect(x: 0, y: 0, width: 334, height: 190))
-    view.compactHeight = view.minimumReadoutHeight
+    view.compactHeight = NSScreen.screens.first(where: { $0.safeAreaInsets.top > 0 })?.safeAreaInsets.top ?? 32
     view.percent = 75
     view.dailyPercent = 55
     view.weeklyUsed = 25

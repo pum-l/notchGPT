@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.0.2 — 2026-10-19
+
+- Match the compact extension height to the physical notch; retain fixed header placement throughout expansion and collapse.
+- Show `window` instead of `daily`, with a separate ten-weekly-point planning budget for each 09–13 and 14–18 work block.
+- Align expanded consumption, menu guidance and status with the visible window budget. Preserve existing daily/chart history.
+- Verify 84 math checks and ten hover cycles, including physical-notch height within AppKit's half-point frame rounding.
+
 ## 1.0.1 — 2026-10-15
 
 - Use one attribution rule for the daily ledger and four-hour charts, including opening/closing boundary readings and excluded gaps.
