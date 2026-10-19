@@ -74,17 +74,27 @@ final class NotchView: NSView {
             pace = decimal(estimate.pace)
             projection = "\(decimal(estimate.projected))%"
         }
-        drawCompactMetric("window", value: block.map { $0.startHour == 9 ? "09–13" : "14–18" } ?? "—", y: topMetricY, attrs: metricAttrs)
-        drawCompactMetric("pace %/h", value: pace, y: topMetricY - 14, attrs: metricAttrs)
-        drawCompactMetric("estimate", value: projection, y: topMetricY - 28, attrs: metricAttrs)
-        drawRightMetric("weekly used", value: weeklyUsed.map { "\(decimal($0))%" } ?? "—", y: topMetricY, attrs: metricAttrs)
-        drawRightMetric("window used", value: block.map { "\(decimal($0.used / FourHourHistory.windowAllowance * 100))%" } ?? "—", y: topMetricY - 14, attrs: metricAttrs)
-        drawRightMetric("samples", value: block.map { "\($0.samples.count)" } ?? "0", y: topMetricY - 28, attrs: metricAttrs)
+        let windowUsage = block.map { $0.used / FourHourHistory.windowAllowance * 100 }
+        let metrics: [(String, String)] = [
+            ("window", block.map { $0.startHour == 9 ? "09–13" : "14–18" } ?? "—"),
+            ("pace %/h", pace),
+            ("estimate", projection),
+            ("weekly used", weeklyUsed.map { "\(decimal($0))%" } ?? "—"),
+            ("window used", windowUsage.map { "\(decimal($0))%" } ?? "—"),
+            ("samples", block.map { "\($0.samples.count)" } ?? "0")
+        ]
+        let labelWidth = metrics.map { ($0.0 as NSString).size(withAttributes: metricAttrs).width }.max() ?? 0
+        let valueRight = textInset + labelWidth + 12 + ("100.0%" as NSString).size(withAttributes: metricAttrs).width
+        for (index, metric) in metrics.enumerated() {
+            let y = topMetricY - CGFloat(index) * 14
+            (metric.0 as NSString).draw(at: NSPoint(x: textInset, y: y), withAttributes: metricAttrs)
+            drawRight(metric.1, right: valueRight, y: y, attrs: metricAttrs)
+        }
 
         let chartRect = NSRect(x: 32, y: 24, width: bounds.width - 44, height: 32)
         let windowTitle = "window usage · \(block.map { $0.startHour == 9 ? "09–13" : "14–18" } ?? "—")"
-        drawRight(windowTitle, right: bounds.width - textInset, y: chartRect.maxY + 12,
-                  attrs: [.font: NSFont.systemFont(ofSize: 9, weight: .semibold), .foregroundColor: NSColor(calibratedWhite: 0.82, alpha: 1)])
+        (windowTitle as NSString).draw(at: NSPoint(x: textInset, y: chartRect.maxY + 22),
+                  withAttributes: [.font: NSFont.systemFont(ofSize: 9, weight: .semibold), .foregroundColor: NSColor(calibratedWhite: 0.82, alpha: 1)])
         drawChart(points: block?.samples ?? [], startHour: block?.startHour ?? 9,
                   since: block?.trackingSince, plotRect: chartRect)
         drawChartAxisLabels(startHour: block?.startHour ?? 9, rect: chartRect)
@@ -104,20 +114,6 @@ final class NotchView: NSView {
         formatter.locale = Locale(identifier: "en_US_POSIX")
         formatter.dateFormat = "HH:mm"
         return formatter.string(from: date)
-    }
-
-    private func drawCompactMetric(_ label: String, value: String, y: CGFloat,
-                                   attrs: [NSAttributedString.Key: Any]) {
-        let valueSize = (value as NSString).size(withAttributes: attrs)
-        let labelStart = textInset
-        (label as NSString).draw(at: NSPoint(x: labelStart, y: y), withAttributes: attrs)
-        (value as NSString).draw(at: NSPoint(x: compactWidth - textInset - valueSize.width, y: y), withAttributes: attrs)
-    }
-
-    private func drawRightMetric(_ label: String, value: String, y: CGFloat,
-                                 attrs: [NSAttributedString.Key: Any]) {
-        (label as NSString).draw(at: NSPoint(x: compactWidth + textInset, y: y), withAttributes: attrs)
-        drawRight(value, right: bounds.width - textInset, y: y, attrs: attrs)
     }
 
     private func muted(_ attrs: [NSAttributedString.Key: Any]) -> [NSAttributedString.Key: Any] {
@@ -238,7 +234,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     let historyURL = FileManager.default.homeDirectoryForCurrentUser
         .appendingPathComponent("Library/Application Support/notchGPT/four-hour-history.json")
     let compactWidth = NotchLayout.compactWidth
-    let expandedHeight: CGFloat = 190
+    let expandedHeight: CGFloat = 232
     var isExpanded = false
     var frameAnimationTimer: Timer?
     var hoverTimer: Timer?
@@ -364,7 +360,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         do {
             try FileManager.default.createDirectory(at: stateURL.deletingLastPathComponent(), withIntermediateDirectories: true)
             try proc.run()
-            send(["method": "initialize", "id": 0, "params": ["clientInfo": ["name": "notchgpt", "title": "notchGPT", "version": "1.0.3"]]])
+            send(["method": "initialize", "id": 0, "params": ["clientInfo": ["name": "notchgpt", "title": "notchGPT", "version": "1.0.4"]]])
         } catch { fail("Could not start usage service") }
     }
 
@@ -630,7 +626,7 @@ if CommandLine.arguments.contains("--test-hover") {
     try rep.representation(using: .png, properties: [:])!.write(to: URL(fileURLWithPath: CommandLine.arguments[index + 1]))
 } else if let index = CommandLine.arguments.firstIndex(of: "--preview-expanded"), CommandLine.arguments.count > index + 1 {
     _ = NSApplication.shared
-    let view = NotchView(frame: NSRect(x: 0, y: 0, width: 334, height: 190))
+    let view = NotchView(frame: NSRect(x: 0, y: 0, width: 318, height: 232))
     view.compactHeight = NSScreen.screens.first(where: { $0.safeAreaInsets.top > 0 })?.safeAreaInsets.top ?? 32
     view.percent = 75
     view.dailyPercent = 55
@@ -640,10 +636,11 @@ if CommandLine.arguments.contains("--test-hover") {
     let calendar = Calendar.current
     let now = Date()
     var dayParts = calendar.dateComponents([.year, .month, .day], from: now)
-    dayParts.hour = 16; dayParts.minute = 0
+    let previewHour = calendar.component(.hour, from: now) < 14 ? 9 : 14
+    dayParts.hour = previewHour + 2; dayParts.minute = 0
     let plotEnd = calendar.date(from: dayParts) ?? now
     let sampleTimes = (0..<21).compactMap { calendar.date(byAdding: .minute, value: -6 * (20 - $0), to: plotEnd) }
-    view.history = FourHourHistory(blocks: [UsageBlock(day: FourHourHistory.dayKey(now), startHour: 14,
+    view.history = FourHourHistory(blocks: [UsageBlock(day: FourHourHistory.dayKey(now), startHour: previewHour,
         samples: sampleTimes.enumerated().map { UsageSample(time: $0.element, used: Double($0.offset) * 0.07) },
         baseline: 30, latest: 31.4)])
     let rep = view.bitmapImageRepForCachingDisplay(in: view.bounds)!

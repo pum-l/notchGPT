@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.0.4 — 2026-10-19
+
+- Place all expanded statistics in one list at the left edge, with values aligned in a nearby column.
+- Left-align the window usage title and its sampling caption. Add vertical space for the list while preserving compact dimensions and header anchoring.
+
 ## 1.0.3 — 2026-10-19
 
 - Bring the labels closer to their right-aligned percentages by reducing the compact width from 134 to 110 pt. Keep the notch height, side insets and fixed readout during hover animations.
