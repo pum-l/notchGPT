@@ -74,22 +74,12 @@ final class NotchView: NSView {
             pace = decimal(estimate.pace)
             projection = "\(decimal(estimate.projected))%"
         }
-        let windowUsage = block.map { $0.used / FourHourHistory.windowAllowance * 100 }
-        let metrics: [(String, String)] = [
-            ("window", block.map { $0.startHour == 9 ? "09–13" : "14–18" } ?? "—"),
-            ("pace %/h", pace),
-            ("estimate", projection),
-            ("weekly used", weeklyUsed.map { "\(decimal($0))%" } ?? "—"),
-            ("window used", windowUsage.map { "\(decimal($0))%" } ?? "—"),
-            ("samples", block.map { "\($0.samples.count)" } ?? "0")
-        ]
-        let labelWidth = metrics.map { ($0.0 as NSString).size(withAttributes: metricAttrs).width }.max() ?? 0
-        let valueRight = textInset + labelWidth + 12 + ("100.0%" as NSString).size(withAttributes: metricAttrs).width
-        for (index, metric) in metrics.enumerated() {
-            let y = topMetricY - CGFloat(index) * 14
-            (metric.0 as NSString).draw(at: NSPoint(x: textInset, y: y), withAttributes: metricAttrs)
-            drawRight(metric.1, right: valueRight, y: y, attrs: metricAttrs)
-        }
+        drawCompactMetric("window", value: block.map { $0.startHour == 9 ? "09–13" : "14–18" } ?? "—", y: topMetricY, attrs: metricAttrs)
+        drawCompactMetric("pace %/h", value: pace, y: topMetricY - 14, attrs: metricAttrs)
+        drawCompactMetric("estimate", value: projection, y: topMetricY - 28, attrs: metricAttrs)
+        drawRightMetric("weekly used", value: weeklyUsed.map { "\(decimal($0))%" } ?? "—", y: topMetricY, attrs: metricAttrs)
+        drawRightMetric("window used", value: block.map { "\(decimal($0.used / FourHourHistory.windowAllowance * 100))%" } ?? "—", y: topMetricY - 14, attrs: metricAttrs)
+        drawRightMetric("samples", value: block.map { "\($0.samples.count)" } ?? "0", y: topMetricY - 28, attrs: metricAttrs)
 
         let chartRect = NSRect(x: 32, y: 24, width: bounds.width - 44, height: 32)
         let windowTitle = "window usage · \(block.map { $0.startHour == 9 ? "09–13" : "14–18" } ?? "—")"
@@ -114,6 +104,20 @@ final class NotchView: NSView {
         formatter.locale = Locale(identifier: "en_US_POSIX")
         formatter.dateFormat = "HH:mm"
         return formatter.string(from: date)
+    }
+
+    private func drawCompactMetric(_ label: String, value: String, y: CGFloat,
+                                   attrs: [NSAttributedString.Key: Any]) {
+        let valueSize = (value as NSString).size(withAttributes: attrs)
+        let labelStart = textInset
+        (label as NSString).draw(at: NSPoint(x: labelStart, y: y), withAttributes: attrs)
+        (value as NSString).draw(at: NSPoint(x: compactWidth - textInset - valueSize.width, y: y), withAttributes: attrs)
+    }
+
+    private func drawRightMetric(_ label: String, value: String, y: CGFloat,
+                                 attrs: [NSAttributedString.Key: Any]) {
+        (label as NSString).draw(at: NSPoint(x: compactWidth + textInset, y: y), withAttributes: attrs)
+        drawRight(value, right: bounds.width - textInset, y: y, attrs: attrs)
     }
 
     private func muted(_ attrs: [NSAttributedString.Key: Any]) -> [NSAttributedString.Key: Any] {
@@ -234,7 +238,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     let historyURL = FileManager.default.homeDirectoryForCurrentUser
         .appendingPathComponent("Library/Application Support/notchGPT/four-hour-history.json")
     let compactWidth = NotchLayout.compactWidth
-    let expandedHeight: CGFloat = 232
+    let expandedHeight: CGFloat = 190
     var isExpanded = false
     var frameAnimationTimer: Timer?
     var hoverTimer: Timer?
@@ -360,7 +364,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         do {
             try FileManager.default.createDirectory(at: stateURL.deletingLastPathComponent(), withIntermediateDirectories: true)
             try proc.run()
-            send(["method": "initialize", "id": 0, "params": ["clientInfo": ["name": "notchgpt", "title": "notchGPT", "version": "1.0.4"]]])
+            send(["method": "initialize", "id": 0, "params": ["clientInfo": ["name": "notchgpt", "title": "notchGPT", "version": "1.0.5"]]])
         } catch { fail("Could not start usage service") }
     }
 
@@ -626,7 +630,7 @@ if CommandLine.arguments.contains("--test-hover") {
     try rep.representation(using: .png, properties: [:])!.write(to: URL(fileURLWithPath: CommandLine.arguments[index + 1]))
 } else if let index = CommandLine.arguments.firstIndex(of: "--preview-expanded"), CommandLine.arguments.count > index + 1 {
     _ = NSApplication.shared
-    let view = NotchView(frame: NSRect(x: 0, y: 0, width: 318, height: 232))
+    let view = NotchView(frame: NSRect(x: 0, y: 0, width: 318, height: 190))
     view.compactHeight = NSScreen.screens.first(where: { $0.safeAreaInsets.top > 0 })?.safeAreaInsets.top ?? 32
     view.percent = 75
     view.dailyPercent = 55

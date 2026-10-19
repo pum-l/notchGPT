@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.0.5 — 2026-10-19
+
+- Restore the original two-column expanded statistics and 190 pt expanded height. Only the chart title moves to the left, with enough separation from the sampling caption.
+
 ## 1.0.4 — 2026-10-19
 
 - Place all expanded statistics in one list at the left edge, with values aligned in a nearby column.
