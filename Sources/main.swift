@@ -3,8 +3,12 @@ import QuartzCore
 
 // Passive client of the official Codex app-server. Never starts model turns.
 
+private enum NotchLayout {
+    static let compactWidth: CGFloat = 110
+}
+
 final class NotchView: NSView {
-    private let compactWidth: CGFloat = 134
+    private let compactWidth = NotchLayout.compactWidth
     private let textInset: CGFloat = 12
     var compactHeight: CGFloat = 38
     var readoutRect: NSRect { NSRect(x: 0, y: bounds.height - compactHeight, width: compactWidth, height: compactHeight) }
@@ -233,7 +237,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         .appendingPathComponent("Library/Application Support/notchGPT/status.json")
     let historyURL = FileManager.default.homeDirectoryForCurrentUser
         .appendingPathComponent("Library/Application Support/notchGPT/four-hour-history.json")
-    let compactWidth: CGFloat = 134
+    let compactWidth = NotchLayout.compactWidth
     let expandedHeight: CGFloat = 190
     var isExpanded = false
     var frameAnimationTimer: Timer?
@@ -360,7 +364,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         do {
             try FileManager.default.createDirectory(at: stateURL.deletingLastPathComponent(), withIntermediateDirectories: true)
             try proc.run()
-            send(["method": "initialize", "id": 0, "params": ["clientInfo": ["name": "notchgpt", "title": "notchGPT", "version": "1.0.2"]]])
+            send(["method": "initialize", "id": 0, "params": ["clientInfo": ["name": "notchgpt", "title": "notchGPT", "version": "1.0.3"]]])
         } catch { fail("Could not start usage service") }
     }
 
@@ -611,7 +615,7 @@ if CommandLine.arguments.contains("--test-hover") {
 } else if let index = CommandLine.arguments.firstIndex(of: "--preview"), CommandLine.arguments.count > index + 1 {
     _ = NSApplication.shared
     let height = NSScreen.screens.first(where: { $0.safeAreaInsets.top > 0 })?.safeAreaInsets.top ?? 32
-    let view = NotchView(frame: NSRect(x: 0, y: 0, width: 134, height: height))
+    let view = NotchView(frame: NSRect(x: 0, y: 0, width: NotchLayout.compactWidth, height: height))
     view.compactHeight = height
     view.percent = 75
     view.dailyPercent = 55

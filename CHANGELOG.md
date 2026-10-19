@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.0.3 — 2026-10-19
+
+- Bring the labels closer to their right-aligned percentages by reducing the compact width from 134 to 110 pt. Keep the notch height, side insets and fixed readout during hover animations.
+
 ## 1.0.2 — 2026-10-19
 
 - Match the compact extension height to the physical notch; retain fixed header placement throughout expansion and collapse.
