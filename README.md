@@ -6,6 +6,14 @@ no Dock icon while running. The app bundle has an original blue/teal allowance i
 in an activity-tracker style, reproducible with `swift scripts/generate-icon.swift`. Click to expand or collapse; click outside or press Escape to close. All text uses shared native system font styles; numerical readouts use tabular digits. The two percentage dials stay
 fixed beside the notch throughout both animations.
 
+## Screenshots — 2.1.0
+
+[View the screenshot gallery](docs/screenshots/README.md). Chat titles and remote computer names are blurred for privacy; account and Settings previews use synthetic values.
+
+| Daily usage | Recent chats — private details blurred |
+| --- | --- |
+| ![Daily usage and half-hour chart](docs/screenshots/2.1.0-daily-usage.jpg) | ![Recent chats with private details blurred](docs/screenshots/2.1.0-recent-chats-private.png) |
+
 ## What it shows
 
 - **Left dial** (dark yellow by default): the smallest remainder of the quota windows returned for Codex.
