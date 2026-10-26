@@ -8,18 +8,23 @@ app="$scratch/notchGPT.app"
 mkdir -p build
 mkdir -p "$app/Contents/MacOS"
 /bin/cp -X Resources/Info.plist "$app/Contents/Info.plist"
+sdk="$(xcrun --sdk macosx --show-sdk-version)"
+/usr/libexec/PlistBuddy -c "Set :DTSDKName macosx$sdk" "$app/Contents/Info.plist"
+/usr/libexec/PlistBuddy -c "Set :DTPlatformVersion $sdk" "$app/Contents/Info.plist"
 mkdir -p "$app/Contents/Resources"
 /bin/cp -X Resources/AppIcon.icns "$app/Contents/Resources/AppIcon.icns"
+/bin/cp -X Resources/Assets.car "$app/Contents/Resources/Assets.car"
+/bin/cp -X Resources/recent-chats.mjs "$app/Contents/Resources/recent-chats.mjs"
 if [[ "${1:-}" == "--universal" ]]; then
     for arch in arm64 x86_64; do
         xcrun swiftc -O -swift-version 5 -target "$arch-apple-macos13.0" \
-            -framework AppKit Sources/Quota.swift Sources/WorkUsage.swift Sources/DailyBudget.swift Sources/FourHourHistory.swift Sources/main.swift -o "$scratch/notchGPT-$arch"
+            -framework AppKit Sources/Quota.swift Sources/WorkUsage.swift Sources/DailyBudget.swift Sources/FourHourHistory.swift Sources/DailyUsage.swift Sources/Preferences.swift Sources/SettingsView.swift Sources/RecentChats.swift Sources/main.swift -o "$scratch/notchGPT-$arch"
     done
     xcrun lipo -create "$scratch/notchGPT-arm64" "$scratch/notchGPT-x86_64" -output "$app/Contents/MacOS/notchGPT"
 elif [[ $# -eq 0 ]]; then
     arch="$(uname -m)"
     xcrun swiftc -O -swift-version 5 -target "$arch-apple-macos13.0" \
-        -framework AppKit Sources/Quota.swift Sources/WorkUsage.swift Sources/DailyBudget.swift Sources/FourHourHistory.swift Sources/main.swift -o "$app/Contents/MacOS/notchGPT"
+        -framework AppKit Sources/Quota.swift Sources/WorkUsage.swift Sources/DailyBudget.swift Sources/FourHourHistory.swift Sources/DailyUsage.swift Sources/Preferences.swift Sources/SettingsView.swift Sources/RecentChats.swift Sources/main.swift -o "$app/Contents/MacOS/notchGPT"
 else
     echo "Usage: $0 [--universal]" >&2
     exit 2

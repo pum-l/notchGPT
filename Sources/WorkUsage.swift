@@ -10,6 +10,20 @@ struct WorkCredit {
 
 // Shared by the daily ledger and chart: amounts are weekly percentage points.
 enum WorkUsage {
+    // Real quota observations differ by up to eleven seconds within one cycle.
+    // Keep the high-water counter across small timestamp corrections.
+    static let resetTolerance: Double = 60
+    static func sameCycle(_ previous: Int?, _ current: Int?) -> Bool {
+        if previous == current { return true }
+        guard let previous, let current else { return false }
+        return abs(Double(previous) - Double(current)) <= resetTolerance
+    }
+    static func remainingPercent(allowance: Double, spent: Double, weeklyUsed: Double) -> Int? {
+        guard allowance.isFinite, allowance > 0, spent.isFinite, spent >= 0,
+              weeklyUsed.isFinite, (0...100).contains(weeklyUsed) else { return nil }
+        let available = min(max(0, allowance - spent), 100 - weeklyUsed)
+        return min(100, max(0, Int(floor(available / allowance * 100 + 0.00000001))))
+    }
     static func segments(from start: Date, to end: Date, calendar: Calendar) -> [WorkCredit] {
         guard end > start else { return [] }
         var day = calendar.startOfDay(for: start)
@@ -38,8 +52,7 @@ enum WorkUsage {
         let duration = end.timeIntervalSince(start)
         guard duration > 0 else { return ([], false) }
         let work = intervals.reduce(0) { $0 + $1.end.timeIntervalSince($1.start) }
-        let changed = previousReset != nil && reset != nil && previousReset != reset
-        if work > 0, duration > 180, abs(work - duration) >= 0.001 { return ([], true) }
+        let changed = previousReset != nil && reset != nil && !sameCycle(previousReset, reset)
         var attributionStart = start
         var delta = max(0, used - previousUsed)
         if changed {
@@ -58,8 +71,12 @@ enum WorkUsage {
             return ([WorkCredit(day: DailyBudget.dayKey(end, calendar: calendar), startHour: active,
                                 start: end, end: end, amount: delta)], changed)
         }
-        guard work > 0 else { return ([], false) }
-        let credits = segments(from: attributionStart, to: end, calendar: calendar).map {
+        let knownIntervals = segments(from: attributionStart, to: end, calendar: calendar)
+        let knownWork = knownIntervals.reduce(0) { $0 + $1.end.timeIntervalSince($1.start) }
+        // Evaluate the known post-reset interval, not an unknown pre-reset tail.
+        if knownWork > 0, knownDuration > 180, abs(knownWork - knownDuration) >= 0.001 { return ([], true) }
+        guard knownWork > 0 else { return ([], changed && work > 0) }
+        let credits = knownIntervals.map {
             WorkCredit(day: $0.day, startHour: $0.startHour, start: $0.start, end: $0.end,
                        amount: delta * min(1, $0.end.timeIntervalSince($0.start) / knownDuration))
         }

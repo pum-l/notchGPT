@@ -10,3 +10,12 @@ auth.json
 status.json
 daily-budget.json
 four-hour-history.json
+
+preferences.json
+remote-hosts.json
+*.sqlite
+*.sqlite-*
+*.db
+*.jsonl
+*.pem
+*.key

@@ -1,6 +1,14 @@
 # Security and privacy
 
-notchGPT is a local, unsandboxed macOS app. Review the source and build scripts before running it. It launches an existing Codex CLI, which uses that CLI's existing credentials and configuration. The app itself does not need an API key, directly read authentication files, capture the screen, inspect conversations, or request Accessibility access.
+notchGPT is a local, unsandboxed macOS app. Review the source and build scripts before running it. It launches the existing Codex CLI for quota and cloud task reads. It does not require an API key, screen capture, Accessibility access, or new account permissions.
+
+The recent-chat helper reads local title/turn metadata through read-only SQLite connections, saved remote summaries and existing writer locks without writing them. It does not read chat message bodies or tool arguments/outputs. Remote task status is the last state saved by Codex, not a live host subscription. Background polling never resumes a thread, starts a turn or approves a request. Explicit card clicks open the selected task with its original host identity; cloud URLs are restricted to HTTPS task paths on chatgpt.com.
+
+For remote computer names, the helper reads the existing file-backed Codex ChatGPT access token and account ID from `CODEX_HOME/auth.json`. It sends only a GET to `https://chatgpt.com/backend-api/codex/remote/control/environments`, rejects redirects and does not refresh, modify, log or copy authentication data. Only host IDs/names, timestamps and a SHA-256 account binding are cached in `remote-hosts.json` with mode 0600. Caches are isolated by account; failed lookups retain the last names for the same account and use bounded retry delays. A missing session or unavailable catalog yields a distinguishable host-ID fallback. The catalog is an internal Codex route and can change. No diagnostics should include raw catalog responses or sign-in files.
+
+Unread status is read from Codex’s identity-scoped saved read state and per-thread read metadata. The helper derives the existing identity binding from ID/access-token claims in memory without logging, persisting or sending those claims. Ambiguous retired execution-host keys are not merged. It does not mark a chat read or create a notification.
+
+Pinned chat IDs, kinds and host IDs are saved only in this app’s preferences. Pin/unpin does not alter Codex’s sidebar or read receipts. Chat titles, status and recency stay in memory. Saved Codex app state can contain other sensitive fields; only selected metadata is extracted, and no raw state is logged or copied into this repository. UI preferences are stored locally; login changes affect only this app’s LaunchAgent.
 
 The repository contains source code, scripts, documentation, and a synthetic UI preview. It must never contain an auth store, bearer token, API key, account identifier, personal filesystem path, live status file or daily ledger, browser state, or raw account response. Build and distribution directories are ignored by Git; a release package should contain only the newly built app bundle.
 

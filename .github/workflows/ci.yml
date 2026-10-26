@@ -16,3 +16,30 @@ jobs:
         run: bash scripts/test.sh
       - name: Build and verify universal app
         run: bash scripts/package.sh
+  release:
+    needs: macos
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: macos-15
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+      - name: Package verified universal release
+        run: bash scripts/package.sh
+      - name: Publish 2.1.0
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          version="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' Resources/Info.plist)"
+          [[ "$version" == "2.1.0" ]] || exit 0
+          if gh release view v2.1.0 >/dev/null 2>&1; then
+            echo 'Release v2.1.0 already exists; preserving its assets.'
+            exit 0
+          fi
+          codesign --verify --deep --strict build/notchGPT.app
+          shasum -a 256 -c dist/notchGPT-2.1.0-universal.zip.sha256
+          gh release create v2.1.0 dist/notchGPT-2.1.0-universal.zip dist/notchGPT-2.1.0-universal.zip.sha256 --target "$GITHUB_SHA" --title 'notchGPT 2.1.0' --notes-file docs/releases/v2.1.0.md

@@ -114,11 +114,13 @@ is silently inserted. The number can therefore overstate the true daily remainde
 
 ## Weekly resets and persistence
 
-A change in `resetsAt` starts a new weekly cycle. It does **not** refill the daily
+A material change in `resetsAt` starts a new weekly cycle. Corrections up to 60 seconds are treated as the same cycle and preserve the high-water baseline; the Oct 16–23 observations contain corrections of one to eleven seconds. It does **not** refill the daily
 budget. Known post-reset usage is attributed only over the interval after the
 reported weekly start (`resetsAt - 10080 minutes`). The unknown consumption between
 the preceding reading and the reset cannot be reconstructed, so coverage becomes
 partial. If the changed reset marker does not place a reset between the two readings, the app rebaselines without charging the whole weekly total. The new weekly cycle gets its own high-water baseline.
+
+Gap exclusion is evaluated over the known post-reset interval, so an unknown pre-reset lunch gap cannot discard consumption that is known to fall entirely in the afternoon. An instantaneous positive reset reading is retained in its actual half-hour bin, with zero invented coverage time.
 
 The ledger in `daily-budget.json` persists today's observed spending, previous
 weekly high-water/reset, timestamp, coverage and calculation version across app
@@ -152,39 +154,47 @@ high-water, so restoring history does not charge it a second time.
 | Mac sleeps from 11:00 to 12:00 | Entire interval is work | Observed positive weekly delta can be assigned to work; no precise intermediate chart points |
 | Mac sleeps from 12:00 to 15:00 | Long interval mixes work and lunch | Gap excluded from daily, partial coverage; later deltas resume normally |
 
-## The four-hour chart is a different denominator
+## Daily half-hour chart and its units
 
-The chart is a local estimate for one scheduled four-hour block, expressed in
-**weekly percentage points**, whereas `daily` is a percentage of a twenty-point
-daily budget. A chart value of 3 therefore corresponds to 15% of the daily target,
-if all that use was captured by the daily ledger. Missing samples/boundary
-attribution can make them differ.
+The chart displays **today's sixteen half-hour increments** in two groups:
+09:00–13:00 and 14:00–18:00. Its unit is **weekly percentage points**, whereas
+`Day used` and `Day left` are percentages of the twenty-point daily budget.
+A bar of 3 weekly points therefore corresponds to 15% of that daily target.
+The window used statistic has its own ten-point denominator.
 
 The chart and daily ledger share the same attribution function, high-water rule,
-reset handling and gap policy. Readings outside work also advance the chart's
-weekly baseline, so lunch/evening use cannot leak into the next block. A short
-reading interval straddling 09:00 or 14:00 can create a zero baseline at opening;
-one straddling 13:00 or 18:00 records its work share at the exact closing time.
-Otherwise the chart starts at its first observed sample and shows cumulative
-increases from that baseline. It preserves cumulative consumption through a
-weekly reset and avoids duplicate charges after corrections. A known positive
-reading at the exact reset timestamp is retained when that instant is inside
-work; reset timestamps only have second precision. Unobserved intervals over 180 seconds
-break the drawn line. No area is drawn towards future hours. The selected active
-window never falls back to yesterday's graph; outside work the app can show today's
-last observed block. Fourteen blocks are retained locally.
+reset handling and gap policy. Readings outside work advance the baseline, so
+lunch/evening use cannot leak into the next block. Each incoming cumulative
+increment is split proportionally over its observed interval's overlap with the
+half-hour bins. These increments sum to the observed daily total; they are not
+cumulative bar heights. This is an allocation between readings, not exact event
+timing, and source quota rounding/reporting delays still apply.
 
-`pace %/h` = observed block consumption / hours between first and last samples.
+A baseline bar indicates observed zero. A dash indicates no data, and upcoming
+slots have no filled bar. Hatching indicates partial interval coverage or an
+interval longer than 180 seconds whose precise half-hour timing is estimated.
+Hovering gives the time range, value and status. New history stores an optional
+incoming interval start, preserving excluded gaps without labelling them zero.
+Older files remain readable without deleting or migrating their samples; long
+legacy intervals have explicitly estimated placement.
+
+The graph always shows the current local day and both windows, even after 18:00;
+it never falls back to yesterday. Fourteen work blocks remain stored locally.
+`Tracked` sums the chart's covered intervals, including estimated long intervals;
+it does not count unobserved time before startup. A day with partial coverage is
+not proof of zero spending in missing periods.
+
+`Pace/h` = consumption credited over intervals with known duration / the sum of those intervals in hours. Explicitly unobserved gaps and instantaneous credits are excluded from that rate; instantaneous consumption still contributes to the block total. Legacy samples without interval starts use adjacent sample timestamps.
 It does not drift downward merely because an old graph is viewed later. With fewer
 than two distinct samples, pace and estimate are unavailable.
 
-During an active block, `estimate` = observed consumption + the current average pace × hours from the last
+During an active block, `Forecast` = observed consumption + the current average pace × hours from the last
 sample until the block's local end, capped by remaining weekly quota. For 4 weekly
 points used from 14:00 to 16:00, pace is 2 points/hour and the projected block total
 at 18:00 is 8 points. This is a constant-pace forecast, not a subscription limit or
-guarantee. Once the block has ended, `estimate` equals its observed consumption;
+guarantee. Once the block has ended, `Forecast` equals its observed consumption;
 it never projects into an already elapsed, unobserved tail. Gaps/rounding make it
-approximate. `samples` counts stored chart points, including boundary anchors,
+approximate. `Samples` counts stored chart points, including boundary anchors,
 not tasks, messages or model turns. Zero samples do not establish zero consumption.
 
 The integration suite independently checks all 480 working minutes against a

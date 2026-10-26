@@ -9,10 +9,15 @@ struct WeeklyQuota {
     init?(_ snapshot: [String: Any]) {
         for key in ["primary", "secondary"] {
             guard let window = snapshot[key] as? [String: Any],
-                  (window["windowDurationMins"] as? Int) == 10080,
+                  let duration = window["windowDurationMins"] as? NSNumber,
+                  CFGetTypeID(duration) != CFBooleanGetTypeID(), duration.doubleValue == 10080,
                   let number = window["usedPercent"] as? NSNumber,
                   CFGetTypeID(number) != CFBooleanGetTypeID(),
-                  let reset = window["resetsAt"] as? Int else { continue }
+                  let resetNumber = window["resetsAt"] as? NSNumber,
+                  CFGetTypeID(resetNumber) != CFBooleanGetTypeID() else { continue }
+            let resetValue = resetNumber.doubleValue
+            guard resetValue.isFinite, resetValue > 0, resetValue < 253402300800, resetValue.rounded() == resetValue else { continue }
+            let reset = Int(resetValue)
             let used = number.doubleValue
             guard used.isFinite, used >= 0, used <= 100 else { continue }
             self.used = used
@@ -70,7 +75,7 @@ struct DailyBudget: Codable {
                                               from: old.observedAt, to: now, calendar: calendar)
         spent += attribution.credits.filter { $0.day == day }.reduce(0) { $0 + $1.amount }
         if observedWork > 0, attribution.partial { complete = false }
-        let highWater = quota.resetsAt == old.previousReset ? max(old.previousUsed, quota.used) : quota.used
+        let highWater = WorkUsage.sameCycle(old.previousReset, quota.resetsAt) ? max(old.previousUsed, quota.used) : quota.used
         return DailyBudget(day: day, spent: spent, previousUsed: highWater,
                            previousReset: quota.resetsAt, observedAt: now, completeDay: complete)
     }
@@ -86,7 +91,6 @@ struct DailyBudget: Codable {
 
     func remainingPercent(weekly: WeeklyQuota, now: Date, calendar: Calendar = .current) -> Int? {
         guard day == Self.dayKey(now, calendar: calendar), !calendar.isDateInWeekend(now) else { return nil }
-        let left = min(max(0, Self.allowance - spent), max(0, 100 - weekly.used))
-        return min(100, max(0, Int(floor(left / Self.allowance * 100 + 0.00000001))))
+        return WorkUsage.remainingPercent(allowance: Self.allowance, spent: spent, weeklyUsed: weekly.used)
     }
 }

@@ -42,9 +42,21 @@ if [[ -d "$legacy_app" ]] && [[ "$(/usr/libexec/PlistBuddy -c 'Print :CFBundleId
     rm -f "$HOME/Library/Logs/NotchUsage.log"
 fi
 launchctl bootout "$domain/$label" 2>/dev/null || true
+# Also stop this exact installed executable when login startup was disabled and
+# the previous instance was opened manually.
+/usr/bin/python3 - "$app_dir/Contents/MacOS/notchGPT" <<'PY_STOP'
+import os, signal, subprocess, sys, time
+for line in subprocess.check_output(['/bin/ps','-axo','pid=,comm='],text=True).splitlines():
+    fields=line.strip().split(None,1)
+    if len(fields)==2 and fields[1]==sys.argv[1]:
+        try: os.kill(int(fields[0]),signal.SIGTERM)
+        except ProcessLookupError: pass
+PY_STOP
 rm -rf "$app_dir"
 mv "$stage/notchGPT.app" "$app_dir"
 codesign --verify --deep --strict "$app_dir"
+swift "$project_dir/scripts/refresh-file-icon.swift" "$app_dir"
+codesign --verify --deep "$app_dir"
 rm -f "$agent"
 plutil -create xml1 "$agent"
 plutil -insert Label -string "$label" "$agent"
@@ -59,6 +71,13 @@ plutil -insert ProcessType -string Interactive "$agent"
 plutil -insert StandardOutPath -string "$HOME/Library/Logs/notchGPT.log" "$agent"
 plutil -insert StandardErrorPath -string "$HOME/Library/Logs/notchGPT.log" "$agent"
 plutil -lint "$agent"
-launchctl bootstrap "$domain" "$agent"
+login_enabled="$(/usr/bin/plutil -extract startAtLogin raw -o - "$HOME/Library/Application Support/notchGPT/preferences.json" 2>/dev/null || true)"
+if [[ "$login_enabled" == "false" ]]; then
+    launchctl disable "$domain/$label"
+    /usr/bin/open "$app_dir"
+else
+    launchctl enable "$domain/$label"
+    launchctl bootstrap "$domain" "$agent"
+fi
 echo "Installed and started: $app_dir"
-echo "Starts automatically at login. Click the widget for Refresh Now or Quit."
+echo "Login startup follows your saved settings. Use the gear button to change it."

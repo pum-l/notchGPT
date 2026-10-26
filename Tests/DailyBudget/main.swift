@@ -53,7 +53,7 @@ let exact = DailyBudget.sample(previous:b,quota:quota(15),now:date(9,2),calendar
 expect(near(exact.spent,b.spent), "same-timestamp sample does not charge twice")
 expect(DailyBudget.workingSeconds(from:date(9,day:23),to:date(18,day:26),calendar:cal)==16*3600, "DST weekend preserves eight local work hours on Friday and Monday")
 
-let markerMoved = DailyBudget.sample(previous:beforeReset,quota:quota(91,resetAt:reset+60),now:date(10,1),calendar:cal)
+let markerMoved = DailyBudget.sample(previous:beforeReset,quota:quota(91,resetAt:reset+120),now:date(10,1),calendar:cal)
 expect(near(markerMoved.spent,4) && !markerMoved.completeDay, "unconfirmed reset-marker change cannot charge whole weekly usage")
 
 let continuousWork = DailyBudget(day:b.day,spent:3,previousUsed:20,previousReset:reset,observedAt:date(10),completeDay:true)
