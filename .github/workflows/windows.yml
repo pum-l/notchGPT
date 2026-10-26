@@ -75,7 +75,7 @@ jobs:
         run: |
           set -euo pipefail
           gh run download "$GITHUB_RUN_ID" --name notchGPT-2.1.0-windows --dir output
-          cd output
+          cd output/dist/windows
           sha256sum -c ./*.sha256
           if gh release view v2.1.0-windows.1 >/dev/null 2>&1; then
             echo 'Windows preview already exists; preserving its assets.'
