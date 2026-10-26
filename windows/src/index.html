@@ -1,0 +1,189 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self' data:; connect-src 'none'; base-uri 'none'; form-action 'none'"
+    />
+    <title>notchGPT</title>
+    <link rel="stylesheet" href="style.css" />
+    <script defer src="renderer.js"></script>
+  </head>
+  <body>
+    <main id="app" class="closed">
+      <header>
+        <div class="left-controls">
+          <button
+            class="header-button"
+            id="account-button"
+            aria-label="Account statistics"
+          >
+            <svg class="dial" viewBox="0 0 32 32">
+              <circle class="track" cx="16" cy="16" r="14" />
+              <circle
+                id="quota-progress"
+                class="progress"
+                cx="16"
+                cy="16"
+                r="14"
+              /></svg
+            ><span id="quota-number">—<small>%</small></span></button
+          ><button
+            class="header-button"
+            id="usage-button"
+            aria-label="Window budget statistics"
+          >
+            <svg class="dial" viewBox="0 0 32 32">
+              <circle class="track" cx="16" cy="16" r="14" />
+              <circle
+                id="window-progress"
+                class="progress"
+                cx="16"
+                cy="16"
+                r="14"
+              /></svg
+            ><span id="window-number">—<small>%</small></span>
+          </button>
+        </div>
+        <div id="notch-bridge" aria-hidden="true"></div>
+        <div class="right-controls">
+          <button
+            class="header-button icon-button"
+            id="chats-button"
+            aria-label="Recent chats"
+          >
+            <svg viewBox="0 0 32 32">
+              <circle cx="16" cy="16" r="14" />
+              <path d="M10 10h12v9h-7l-4 3v-3h-1z M13 13h6 M13 16h5" />
+            </svg></button
+          ><button
+            class="header-button icon-button"
+            id="settings-button"
+            aria-label="Settings"
+          >
+            <svg viewBox="0 0 32 32">
+              <circle cx="16" cy="16" r="14" />
+              <path d="M9 11h14 M9 16h14 M9 21h14" />
+              <circle cx="14" cy="11" r="2" />
+              <circle cx="20" cy="16" r="2" />
+              <circle cx="13" cy="21" r="2" />
+            </svg>
+          </button>
+        </div>
+      </header>
+      <div id="body">
+        <section id="account-pane" class="pane" hidden>
+          <div class="toolbar">
+            <h1>Account statistics</h1>
+            <button class="close" aria-label="Close account statistics">
+              ×
+            </button>
+          </div>
+          <div id="account-windows"></div>
+          <p id="account-updated" class="caption"></p>
+          <p class="caption">
+            Official account limits · remaining subscription allowance
+          </p>
+          <p id="quota-error" class="message"></p>
+          <button class="secondary refresh">Refresh now</button>
+        </section>
+        <section id="usage-pane" class="pane" hidden>
+          <div id="usage-stats" class="stats"></div>
+          <div class="chart-heading">
+            <h1>Window budget · daily usage</h1>
+            <span id="chart-date" class="caption"></span>
+          </div>
+          <p class="caption chart-caption">
+            Weekly quota · percentage points per 30 min
+          </p>
+          <svg
+            id="chart"
+            viewBox="0 0 336 183"
+            role="img"
+            aria-label="Daily usage, sixteen half-hour bars"
+          ></svg>
+          <p class="caption chart-foot">
+            Hatched: partial / estimated　 —: no data<br />Day budget: 20 pp ·
+            window: 10 pp · local time
+          </p>
+        </section>
+        <section id="chats-pane" class="pane" hidden>
+          <div class="toolbar">
+            <h1>Recent chats</h1>
+            <div>
+              <button class="refresh" aria-label="Refresh chats">↻</button
+              ><button class="close" aria-label="Close recent chats">×</button>
+            </div>
+          </div>
+          <p id="chat-caption" class="caption"></p>
+          <div id="chat-list" tabindex="0" aria-label="Recent chats"></div>
+          <p id="chat-error" class="caption"></p>
+        </section>
+        <section id="settings-pane" class="pane" hidden>
+          <div class="toolbar">
+            <h1>Settings</h1>
+            <button class="close" aria-label="Close settings">×</button>
+          </div>
+          <div class="colors">
+            <label>ChatGPT color<input type="color" id="quotaColorHex" /></label
+            ><label
+              >Window color<input type="color" id="windowColorHex"
+            /></label>
+          </div>
+          <div class="setting">
+            <label for="hoverToOpen">Open on hover</label
+            ><input id="hoverToOpen" type="checkbox" />
+          </div>
+          <div class="setting">
+            <label for="animateDropdowns">Dropdown animation</label
+            ><input id="animateDropdowns" type="checkbox" />
+          </div>
+          <div class="setting">
+            <label for="usageInterval">Usage refresh</label
+            ><select id="usageInterval">
+              <option value="30">30 seconds</option>
+              <option value="60">60 seconds</option>
+              <option value="120">120 seconds</option>
+              <option value="300">300 seconds</option>
+            </select>
+          </div>
+          <div class="setting">
+            <label for="chatInterval">Chat refresh</label
+            ><select id="chatInterval">
+              <option value="5">5 seconds</option>
+              <option value="15">15 seconds</option>
+              <option value="30">30 seconds</option>
+              <option value="60">60 seconds</option>
+            </select>
+          </div>
+          <div class="setting">
+            <label for="chatCount">Recent chats</label
+            ><select id="chatCount">
+              <option value="5">5 chats</option>
+              <option value="10">10 chats</option>
+            </select>
+          </div>
+          <div class="setting">
+            <label for="textSize">Text size</label
+            ><select id="textSize">
+              <option value="10">Compact</option>
+              <option value="11">Normal</option>
+              <option value="12">Large</option>
+            </select>
+          </div>
+          <div class="setting">
+            <label for="startAtLogin">Launch at login</label
+            ><input id="startAtLogin" type="checkbox" />
+          </div>
+          <p class="caption settings-foot">
+            Chat alerts refresh every 30–60s when closed. Hover opens after a
+            short pause; click outside or press Esc to close.
+          </p>
+          <button id="restore" class="secondary">Restore defaults</button>
+        </section>
+      </div>
+    </main>
+  </body>
+</html>

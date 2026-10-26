@@ -23,3 +23,7 @@ Use the repository's **Security → Report a vulnerability** option when it is e
 3. Confirm the archive contains only the app and no AppleDouble files, diagnostic state, or credentials.
 4. Verify the bundle signature and inspect the binary for personal build paths.
 5. Publish the checksum with the release. Ad-hoc signing is not Developer ID signing or notarization; document that limitation accurately.
+
+## Windows port
+
+The Windows port packages Electron with a sandboxed, isolated renderer, disabled Node integration, restrictive Content Security Policy, denied permission prompts and navigation, validated main-frame IPC and a fixed set of local UI resources served through a secure custom protocol. Titles are inserted as text, never HTML. The main process only opens validated identities from the latest fetched chat list. Shell execution is disabled; Codex must resolve to an absolute native executable. External sign-in and metadata handling use the same read-only helper and account-scoped host cache described above. Windows files inherit the per-user local application-data directory ACL. Demo and desktop-test modes use synthetic data and suppress live reads, real navigation and persistence. See `windows/README.md` for the Windows metadata freshness and portable startup limitations.

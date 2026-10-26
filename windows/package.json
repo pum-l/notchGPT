@@ -1,0 +1,54 @@
+{
+  "name": "notchgpt-windows",
+  "version": "2.1.0",
+  "description": "Windows companion matching the notchGPT macOS interface",
+  "author": "pum-l",
+  "license": "MIT",
+  "main": "src/main.cjs",
+  "private": true,
+  "scripts": {
+    "start": "electron .",
+    "demo": "electron . --demo",
+    "test": "node --test test/*.test.cjs",
+    "test:desktop": "electron . --desktop-test",
+    "dist": "electron-builder --win zip --x64 --arm64"
+  },
+  "devDependencies": {
+    "electron": "45.0.0",
+    "electron-builder": "26.18.0"
+  },
+  "build": {
+    "appId": "dev.notchgpt.windows",
+    "productName": "notchGPT",
+    "directories": {
+      "output": "../dist/windows"
+    },
+    "files": [
+      "src/**",
+      "package.json"
+    ],
+    "extraResources": [
+      {
+        "from": "../Resources/recent-chats.mjs",
+        "to": "recent-chats.mjs"
+      },
+      {
+        "from": "../Resources/AppIcon.png",
+        "to": "AppIcon.png"
+      },
+      {
+        "from": "../LICENSE",
+        "to": "LICENSE.txt"
+      }
+    ],
+    "asar": true,
+    "win": {
+      "target": [
+        "zip"
+      ],
+      "artifactName": "notchGPT-${version}-windows-${arch}.${ext}",
+      "signExecutable": false,
+      "icon": "../Resources/AppIcon.png"
+    }
+  }
+}

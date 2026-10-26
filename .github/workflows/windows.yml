@@ -1,0 +1,84 @@
+name: Windows build and desktop checks
+on:
+  push:
+    branches: [main]
+    paths:
+      [
+        "windows/**",
+        "Resources/recent-chats.mjs",
+        "Resources/AppIcon.png",
+        ".github/workflows/windows.yml",
+      ]
+  pull_request:
+    paths:
+      [
+        "windows/**",
+        "Resources/recent-chats.mjs",
+        ".github/workflows/windows.yml",
+      ]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  windows:
+    runs-on: windows-latest
+    timeout-minutes: 20
+    defaults:
+      run:
+        working-directory: windows
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+        with:
+          node-version: "26"
+          cache: npm
+          cache-dependency-path: windows/package-lock.json
+      - run: npm ci
+      - run: npm test
+      - name: Exercise the desktop on Windows with synthetic data
+        env:
+          NOTCHGPT_TEST_OUTPUT: ${{ github.workspace }}/build/windows-desktop-tests
+        run: npm run test:desktop
+      - name: Build x64 and ARM64 portable ZIPs
+        run: npm run dist
+      - name: Generate checksums
+        shell: pwsh
+        run: |
+          Get-ChildItem ../dist/windows/*.zip | ForEach-Object {
+            $hash = (Get-FileHash $_.FullName -Algorithm SHA256).Hash.ToLowerInvariant()
+            "$hash  $($_.Name)" | Set-Content "$($_.FullName).sha256" -Encoding ascii
+          }
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
+        with:
+          name: notchGPT-2.1.0-windows
+          path: |
+            dist/windows/*.zip
+            dist/windows/*.sha256
+            build/windows-desktop-tests/*.png
+            build/windows-desktop-tests/result.json
+          if-no-files-found: error
+          retention-days: 14
+  publish-preview:
+    needs: windows
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      actions: read
+    steps:
+      - name: Publish Windows preview after native desktop checks
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          gh run download "$GITHUB_RUN_ID" --name notchGPT-2.1.0-windows --dir output
+          cd output
+          sha256sum -c ./*.sha256
+          if gh release view v2.1.0-windows.1 >/dev/null 2>&1; then
+            echo 'Windows preview already exists; preserving its assets.'
+            exit 0
+          fi
+          gh release create v2.1.0-windows.1 ./*.zip ./*.sha256 --target "$GITHUB_SHA" --prerelease --title 'notchGPT 2.1.0 — Windows preview 1' --notes 'Windows x64 and ARM64 portable builds matching the macOS layout. Extract the entire ZIP and open notchGPT.exe. Codex CLI must already be installed and signed in; set CODEX_BIN to its native codex.exe if automatic discovery cannot find it. Includes statistics, daily half-hour chart, recent chat links, pinned ordering, configurable colors, optional hover and slow attention pulses. Built and exercised on a Windows runner with synthetic data; live account integration still needs verification on the target PC. Windows uses its own fonts and acrylic rendering. These builds are not Authenticode signed. See windows/README.md in the source for setup, data handling and known platform differences.'

@@ -6,6 +6,10 @@ no Dock icon while running. The app bundle has an original blue/teal allowance i
 in an activity-tracker style, reproducible with `swift scripts/generate-icon.swift`. Click to expand or collapse; click outside or press Escape to close. All text uses shared native system font styles; numerical readouts use tabular digits. The two percentage dials stay
 fixed beside the notch throughout both animations.
 
+## Windows preview
+
+A Windows port matching the macOS layout is available for x64 and ARM64: [download Windows preview 1](https://github.com/pum-l/notchGPT/releases/tag/v2.1.0-windows.1). See [Windows setup, behavior and platform differences](windows/README.md). Windows recreates the notch with a centered black bridge and uses its own system fonts and backdrop rendering.
+
 ## Screenshots — 2.1.0
 
 [View the screenshot gallery](docs/screenshots/README.md). Chat titles and remote computer names are blurred for privacy; account and Settings previews use synthetic values.

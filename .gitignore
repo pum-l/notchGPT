@@ -19,3 +19,5 @@ remote-hosts.json
 *.jsonl
 *.pem
 *.key
+node_modules/
+windows/.cache/

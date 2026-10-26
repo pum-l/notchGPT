@@ -97,7 +97,9 @@ export function hostNamesFromCatalog(items) {
 }
 export async function readRemoteHostNames({home,cachePath,now=Date.now(),fetcher=fetch}={}) {
   home ??= process.env.CODEX_HOME || path.join(os.homedir(),'.codex');
-  cachePath ??= path.join(os.homedir(),'Library','Application Support','notchGPT','remote-hosts.json');
+  cachePath ??= process.platform === 'win32'
+    ? path.join(process.env.LOCALAPPDATA || path.join(os.homedir(),'AppData','Local'),'notchGPT','remote-hosts.json')
+    : path.join(os.homedir(),'Library','Application Support','notchGPT','remote-hosts.json');
   const auth = safeJSON(path.join(home,'auth.json'));
   const token = auth?.tokens?.access_token, account = auth?.tokens?.account_id;
   if (typeof token !== 'string' || !token || typeof account !== 'string' || !account) return {};
